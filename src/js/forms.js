@@ -1,8 +1,21 @@
 import MicroModal from "micromodal";
 import Pristine from "pristinejs/dist/pristine.min.js";
 
-const forms = document.forms;
-const inputs = document.querySelectorAll(".form__input");
+const initialModalData = {
+  form: document.querySelector(".modal__form").innerHTML,
+  title: document.querySelector(".modal .modal__title").innerText
+};
+
+let validator;
+
+const validatorConfig = {
+  classTo: "form__group",
+  errorTextParent: "form__group",
+  errorClass: "form__group---danger",
+  successClass: "form__group--success",
+  errorTextTag: "span",
+  errorTextClass: "form__error"
+};
 
 Pristine.addValidator(
   "phone",
@@ -22,17 +35,6 @@ Pristine.addValidator(
   2,
   false
 );
-
-const pristineConfig = {
-  classTo: "form__group",
-  errorTextParent: "form__group",
-  errorClass: "form__group---danger",
-  successClass: "form__group--success",
-  errorTextTag: "span",
-  errorTextClass: "form__error"
-};
-
-let pristine;
 
 const populateTrainers = trainers =>
   trainers.map(item => ({
@@ -69,37 +71,30 @@ const formSelectData = {
     )
 };
 
-const formInitialData = {
-  title: document.querySelector(".modal__title").innerText.trim(),
-  label: document
-    .querySelector(".modal__form button[type=submit]")
-    .innerText.trim()
-};
-
 const renderSelect = (form, choices) => {
   const select = document.createElement("div");
   select.classList.add("form__group");
   select.innerHTML = `<select name="choice" class="form__select">
-${choices
-  .map(
-    ({ title, active }) =>
-      `<option value="${title}" ${active ? "selected" : ""}>${title}</option>`
-  )
-  .join("")}
+      ${choices
+        .map(
+          ({ title, active }) =>
+            `<option value="${title}" ${
+              active ? "selected" : ""
+            }>${title}</option>`
+        )
+        .join("")}
 </select>`;
   form.insertBefore(select, form.querySelector(".form__group"));
 };
 
 const renderForm = (modal, label, title, select) => {
   if (!modal) return;
-  if (!modal.querySelector("form")) return;
-  modal.querySelector("button[type=submit]").innerText =
-    label !== "" ? label : formInitialData.label;
-  modal.querySelector(".modal__title").innerText = title
-    ? title
-    : formInitialData.title;
+  const form = modal.querySelector("form");
+  if (!form) return;
+  if (label) modal.querySelector("button[type=submit]").innerText = label;
+  modal.querySelector(".modal__title").innerText =
+    title || initialModalData.title;
   if (formSelectData[select] !== undefined) {
-    const form = modal.querySelector("form");
     const choices = formSelectData[select]();
     renderSelect(form, choices);
   }
@@ -107,12 +102,12 @@ const renderForm = (modal, label, title, select) => {
 
 const resetForm = modal => {
   if (!modal) return;
-  if (!modal.querySelector("form")) return;
-  const select = modal.querySelector(".form__select");
-  if (select) select.parentNode.removeChild(select);
-  if (pristine && pristine instanceof Pristine) {
-    pristine.reset();
-    pristine.destroy();
+  const form = modal.querySelector("form");
+  if (!form) return;
+  form.innerHTML = initialModalData.form;
+  if (validator && validator instanceof Pristine) {
+    validator.reset();
+    validator.destroy();
   }
 };
 
@@ -121,7 +116,7 @@ const renderSuccess = (
   title = "Спасибо!",
   message = "Мы свяжемся с вами в течение 15 минут..."
 ) => {
-  const isModalForm = form.classList.contains("modal__form");
+  const isModalForm = form.matches(".modal__form");
   const successMessage = `<div class="success-message">
 <h2 class="success-message__title">${title}</h2>
 <p class="section-text">${message}</p>
@@ -138,8 +133,8 @@ const renderSuccess = (
 const doSubmit = event => {
   event.preventDefault();
   const { target: form } = event;
-  pristine = new Pristine(form, pristineConfig);
-  const valid = pristine.validate();
+  validator = new Pristine(form, validatorConfig);
+  const valid = validator.validate();
   if (valid) {
     const data = new FormData(form);
     const req = new XMLHttpRequest();
@@ -158,36 +153,40 @@ const doSubmit = event => {
   }
 };
 
-forms.forEach(form => form.addEventListener("submit", doSubmit));
+document.addEventListener("click", ({ target }) => {
+  if (!target.matches("[data-modal]")) return;
+  MicroModal.show("modal", {
+    disableScroll: true,
+    onShow: modal =>
+      renderForm(
+        modal,
+        target.innerText,
+        target.dataset.modalTitle,
+        target.dataset.select
+      ),
+    onClose: modal => resetForm(modal)
+  });
+});
 
-inputs.forEach(input => {
-  const label = input.parentElement.querySelector("label");
-  input.addEventListener("focus", function() {
+document.addEventListener(
+  "focus",
+  ({ target }) => {
+    if (!target.matches(".form__input")) return;
+    const label = target.parentElement.querySelector("label");
     if (label) label.classList.add("form__label--active");
-  });
-});
-
-inputs.forEach(input => {
-  const label = input.parentElement.querySelector("label");
-  input.addEventListener("blur", function() {
-    if (label && !this.value.trim())
-      label.classList.remove("form__label--active");
-  });
-});
-
-const modalButtons = document.querySelectorAll("[data-modal]");
-modalButtons.forEach(button =>
-  button.addEventListener("click", function() {
-    MicroModal.show("modal", {
-      disableScroll: true,
-      onShow: modal =>
-        renderForm(
-          modal,
-          this.innerText,
-          this.dataset.modalTitle,
-          this.dataset.select
-        ),
-      onClose: modal => resetForm(modal)
-    });
-  })
+  },
+  true
 );
+
+document.addEventListener(
+  "blur",
+  ({ target }) => {
+    if (!target.matches(".form__input")) return;
+    const label = target.parentElement.querySelector("label");
+    if (label && !target.value.trim())
+      label.classList.remove("form__label--active");
+  },
+  true
+);
+
+document.addEventListener("submit", doSubmit);

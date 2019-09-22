@@ -1,8 +1,8 @@
-import "core-js/modules/es.object.assign";
-import "core-js/modules/es.array.from";
-import "core-js/modules/es.string.pad-start";
-import "core-js/modules/es.string.ends-with";
+import "core-js/es/object/assign";
 import "core-js/stable/dom-collections/for-each";
+import "core-js/es/string/pad-start";
+import "core-js/es/string/ends-with";
+import "core-js/es/array/from";
 
 import objectFitImages from "object-fit-images";
 import SmoothScroll from "smooth-scroll";
@@ -10,6 +10,12 @@ import SmoothScroll from "smooth-scroll";
 import "./sliders";
 import "./forms";
 import { initScroll } from "./scroll";
+
+if (!Element.prototype.matches) {
+  Element.prototype.matches =
+    Element.prototype.msMatchesSelector ||
+    Element.prototype.webkitMatchesSelector;
+}
 
 objectFitImages(".trainers__images img");
 
@@ -33,31 +39,9 @@ const toggleNav = () => {
 [openNavBtn, closeNavBtn].forEach(el =>
   el.addEventListener("click", toggleNav)
 );
-document.addEventListener("scrollStart", ({ detail: { toggle } }) => {
-  if (toggle.hasAttribute("data-paginate")) return;
-  toggleNav();
-});
 
-const expandButtons = document.querySelectorAll("[data-expand-toggler]");
+const subscriptions = document.querySelectorAll(".subscription__item");
 
-expandButtons.forEach(button => {
-  const container = button.closest(".reviewer").querySelector("[data-expand]");
-  button.addEventListener("click", function(event) {
-    event.preventDefault();
-    if (!container) return;
-    if (container.style.height) {
-      container.style.height = "";
-      this.textContent = "Читать полностью";
-    } else {
-      container.style.height = `${container.scrollHeight}px`;
-      this.textContent = "Свернуть";
-    }
-  });
-});
-
-const subscriptions = document.querySelectorAll(
-  ".subscription__items > .subscription__item"
-);
 subscriptions.forEach(el =>
   el.addEventListener("click", function() {
     subscriptions.forEach(el => {
@@ -66,3 +50,25 @@ subscriptions.forEach(el =>
     this.classList.toggle("subscription__item--active");
   })
 );
+
+document.addEventListener("scrollStart", ({ detail: { toggle } }) => {
+  if (toggle.matches("[data-paginate]")) return;
+  toggleNav();
+});
+
+document.addEventListener("click", event => {
+  if (event.target.matches("[data-expand-toggler]")) {
+    event.preventDefault();
+    const container = event.target
+      .closest(".reviewer")
+      .querySelector("[data-expand]");
+    if (!container) return;
+    if (container.style.height) {
+      container.style.height = "";
+      event.target.textContent = "Читать полностью";
+    } else {
+      container.style.height = `${container.scrollHeight}px`;
+      event.target.textContent = "Свернуть";
+    }
+  }
+});
